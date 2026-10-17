@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sports Physics Simulator</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #f2f2f2;
+    color: #222;
+    font-family: system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+  }
+  .app { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 18px;
+  }
+  h1 { font-size: 22px; margin: 0; }
+
+  .tabs { display: flex; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; }
+  .tab {
+    font-size: 13px;
+    background: #fff;
+    border: none;
+    border-right: 1px solid #ccc;
+    padding: 8px 14px;
+    cursor: pointer;
+  }
+  .tab:last-child { border-right: none; }
+  .tab.active { background: #333; color: #fff; }
+
+  .layout { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+
+  .panel { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 16px; }
+  .panel h2 { font-size: 12px; text-transform: uppercase; color: #888; margin: 0 0 10px; }
+
+  .specimen { display: flex; flex-direction: column; align-items: center; gap: 6px; margin-bottom: 14px; }
+  .specimen canvas { width: 160px; height: 160px; }
+  .specimen .name { font-weight: 600; font-size: 14px; }
+  .specimen .meta { font-size: 11px; color: #888; }
+
+  .group { margin-bottom: 14px; }
+  .field { margin-bottom: 10px; }
+  .field label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 4px;
+  }
+  .field label .unit { color: #999; }
+
+  input[type="number"], select {
+    width: 100%;
+    padding: 7px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #fff;
+    color: #222;
+  }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .toggle-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 7px 0;
+    border-top: 1px solid #eee;
+    font-size: 13px;
+  }
+  .toggle-row:first-child { border-top: none; }
+  .switch { position: relative; width: 36px; height: 20px; }
+  .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .switch .track { position: absolute; inset: 0; background: #ccc; border-radius: 20px; cursor: pointer; }
+  .switch .track::before {
+    content: ""; position: absolute; width: 14px; height: 14px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: transform 0.15s;
+  }
+  .switch input:checked + .track { background: #333; }
+  .switch input:checked + .track::before { transform: translateX(16px); }
+
+  .buttons { display: flex; gap: 8px; margin-top: 14px; }
+  button {
+    font-family: inherit;
+    font-size: 13.5px;
+    padding: 9px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  button.primary { flex: 1; background: #333; color: #fff; border: 1px solid #333; }
+  button.primary:hover { background: #444; }
+  button.secondary { background: #fff; color: #333; border: 1px solid #ccc; }
+  button.secondary:hover { background: #f5f5f5; }
+
+  .right { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .stage { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 14px; }
+  .stage-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 6px; }
+  .stage-head .title { font-size: 13px; font-weight: 600; color: #444; }
+  .legend { display: flex; gap: 12px; font-size: 11px; color: #666; flex-wrap: wrap; }
+  .legend span { display: flex; align-items: center; gap: 4px; }
+  .legend i { width: 12px; height: 2px; display: inline-block; background: #333; }
+  .legend i.ideal { background: none; border-top: 2px dashed #999; }
+  .legend i.g { background: crimson; }
+  .legend i.d { background: darkorange; }
+  .legend i.m { background: steelblue; }
+
+  canvas { width: 100%; height: auto; display: block; background: #eaf3fb; border: 1px solid #eee; border-radius: 4px; }
+
+  .playback { display: flex; align-items: center; gap: 8px; margin-top: 8px; font-size: 12px; color: #666; }
+  .playback select { width: auto; }
+
+  .graphs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  @media (max-width: 700px) { .graphs { grid-template-columns: 1fr; } }
+
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; }
+  .stat { background: #fff; border: 1px solid #ddd; border-radius: 8px; padding: 12px 14px; }
+  .stat .label { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .stat .value { font-size: 20px; font-weight: 700; }
+  .stat .value .unit { font-size: 12px; font-weight: 400; color: #888; margin-left: 2px; }
+  .stat .delta { font-size: 11px; color: #2a7a3f; margin-top: 3px; }
+
+  footer { text-align: center; color: #999; font-size: 11px; margin-top: 24px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <h1>Sports Physics Simulator</h1>
+    <div class="tabs">
+      <button class="tab active" data-sport="football">Football</button>
+      <button class="tab" data-sport="soccer">Soccer</button>
+      <button class="tab" data-sport="basketball">Basketball</button>
+    </div>
+  </header>
+
+  <div class="layout">
+
+    <div class="panel" id="controls">
+
+      <div class="specimen">
+        <canvas id="specimen-canvas" width="260" height="260"></canvas>
+        <div class="name" id="spec-name">Football</div>
+        <div class="meta" id="spec-meta">0.410 kg · 8.5 cm</div>
+      </div>
+
+      <div class="group">
+        <h2>Launch</h2>
+        <div class="field">
+          <label><span>Initial velocity</span><span class="unit">m/s</span></label>
+          <input type="number" id="v0" min="0.5" max="60" step="0.1" value="20">
+        </div>
+        <div class="field">
+          <label><span>Angle</span><span class="unit">deg</span></label>
+          <input type="number" id="angle" min="0" max="90" step="1" value="40">
+        </div>
+        <div class="field">
+          <label><span>Release height</span><span class="unit">m</span></label>
+          <input type="number" id="h0" min="0" max="5" step="0.05" value="1.8">
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>Ball</h2>
+        <div class="two-col">
+          <div class="field">
+            <label><span>Mass</span><span class="unit">kg</span></label>
+            <input type="number" id="mass" min="0.05" max="2" step="0.005" value="0.41">
+          </div>
+          <div class="field">
+            <label><span>Radius</span><span class="unit">cm</span></label>
+            <input type="number" id="radius" min="2" max="20" step="0.1" value="8.5">
+          </div>
+        </div>
+        <div class="field">
+          <label><span>Drag coefficient</span><span class="unit">Cd</span></label>
+          <input type="number" id="cd" min="0" max="0.8" step="0.005" value="0.05">
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>Environment</h2>
+        <div class="two-col">
+          <div class="field">
+            <label><span>Gravity</span><span class="unit">m/s²</span></label>
+            <input type="number" id="g" min="0.5" max="30" step="0.01" value="9.81">
+          </div>
+          <div class="field">
+            <label><span>Air density</span><span class="unit">kg/m³</span></label>
+            <input type="number" id="rho" min="0" max="1.6" step="0.001" value="1.225">
+          </div>
+        </div>
+        <div class="field">
+          <label><span>Wind (+ tailwind)</span><span class="unit">m/s</span></label>
+          <input type="number" id="wind" min="-30" max="30" step="0.5" value="0">
+        </div>
+        <select id="g-preset">
+          <option value="">gravity preset…</option>
+          <option value="9.81">Earth</option>
+          <option value="1.62">Moon</option>
+          <option value="3.72">Mars</option>
+          <option value="24.79">Jupiter</option>
+        </select>
+      </div>
+
+      <div class="group">
+        <h2>Spin</h2>
+        <div class="two-col">
+          <div class="field">
+            <label><span>Rate</span><span class="unit">rpm</span></label>
+            <input type="number" id="spin" min="0" max="3000" step="10" value="600">
+          </div>
+          <div class="field">
+            <label><span>Type</span></label>
+            <select id="spin-type"></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>Target</h2>
+        <div class="two-col">
+          <div class="field">
+            <label><span>Distance</span><span class="unit">m</span></label>
+            <input type="number" id="goal-distance" min="1" max="100" step="0.5" value="38">
+          </div>
+          <div class="field">
+            <label><span>Height</span><span class="unit">m</span></label>
+            <input type="number" id="goal-height" min="0.5" max="10" step="0.05" value="3.05">
+          </div>
+        </div>
+      </div>
+
+      <div class="group">
+        <h2>Forces</h2>
+        <div class="toggle-row">
+          <span>Air resistance</span>
+          <label class="switch"><input type="checkbox" id="toggle-drag" checked><span class="track"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span>Magnus effect</span>
+          <label class="switch"><input type="checkbox" id="toggle-magnus" checked><span class="track"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span>Show ideal path</span>
+          <label class="switch"><input type="checkbox" id="toggle-ideal" checked><span class="track"></span></label>
+        </div>
+        <div class="toggle-row">
+          <span>Keep previous shots</span>
+          <label class="switch"><input type="checkbox" id="toggle-keep"><span class="track"></span></label>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <button class="primary" id="launch-btn">Launch</button>
+        <button class="secondary" id="clear-btn">Clear</button>
+      </div>
+    </div>
+
+    <div class="right">
+
+      <div class="stage">
+        <div class="stage-head">
+          <span class="title">Trajectory</span>
+          <div class="legend">
+            <span><i></i>path</span>
+            <span><i class="ideal"></i>ideal</span>
+            <span><i class="g"></i>gravity</span>
+            <span><i class="d"></i>drag</span>
+            <span><i class="m"></i>magnus</span>
+          </div>
+        </div>
+        <canvas id="stage-canvas" width="1180" height="540"></canvas>
+        <div class="playback">
+          <span>Speed</span>
+          <select id="speed">
+            <option value="0.5">0.5×</option>
+            <option value="1" selected>1×</option>
+            <option value="1.5">1.5×</option>
+            <option value="2">2×</option>
+            <option value="3">3×</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="graphs">
+        <div class="stage">
+          <div class="stage-head"><span class="title">Height vs. time</span></div>
+          <canvas id="graph-height" width="560" height="220"></canvas>
+        </div>
+        <div class="stage">
+          <div class="stage-head"><span class="title">Speed vs. time</span></div>
+          <canvas id="graph-speed" width="560" height="220"></canvas>
+        </div>
+      </div>
+
+      <div class="stats" id="stats">
+        <div class="stat">
+          <div class="label">Result</div>
+          <div class="value" id="stat-result">–</div>
+        </div>
+        <div class="stat">
+          <div class="label">Range</div>
+          <div class="value" id="stat-range">–<span class="unit">m</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">Max height</div>
+          <div class="value" id="stat-height">–<span class="unit">m</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">Flight time</div>
+          <div class="value" id="stat-time">–<span class="unit">s</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">Impact speed</div>
+          <div class="value" id="stat-impact">–<span class="unit">m/s</span></div>
+        </div>
+        <div class="stat">
+          <div class="label">Distance to rest</div>
+          <div class="value" id="stat-rest">–<span class="unit">m</span></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>drag + Magnus flight, wind, spin decay, bounce and roll</footer>
+</div>
+
+<script>
+(function(){
+
+  const presets = {
+    football: { v0:20, angle:40, h0:1.8, mass:0.41, radius:8.5, cd:0.05, g:9.81, rho:1.225, spin:600, spinType:'spiral' },
+    soccer:   { v0:25, angle:16, h0:0.25, mass:0.43, radius:11,  cd:0.25, g:9.81, rho:1.225, spin:400, spinType:'top' },
+    basketball:{v0:7.5, angle:48, h0:2.1, mass:0.62, radius:12,  cd:0.47, g:9.81, rho:1.225, spin:120, spinType:'back' }
+  };
+  const colors = { football:'#a9662f', soccer:'#666', basketball:'#d9701f' };
+  const names = { football:'Football', soccer:'Soccer ball', basketball:'Basketball' };
+  const goalDistanceDefaults = { football:38, soccer:20, basketball:5 };
+  const goalHeightDefaults = { football:3.05, soccer:2.44, basketball:3.05 };
+  const spinOptions = {
+    football: [['spiral','Spiral'],['back','Punt (backspin)'],['top','Punt (topspin)']],
+    soccer: [['back','Backspin'],['top','Topspin']],
+    basketball: [['back','Backspin'],['top','Topspin']]
+  };
+  let sport = 'football';
+
+  const spriteSize = 320;
+
+  function footballSprite(){
+    const s = spriteSize, c = document.createElement('canvas'); c.width=s; c.height=s;
+    const g = c.getContext('2d'), cx=s/2, cy=s/2;
+    g.save(); g.translate(cx,cy);
+    const rx=s*0.47, ry=s*0.30;
+    const grad = g.createLinearGradient(-rx,-ry,rx,ry);
+    grad.addColorStop(0,'#8a5326'); grad.addColorStop(0.5,'#c17a3f'); grad.addColorStop(1,'#5f3517');
+    g.beginPath(); g.ellipse(0,0,rx,ry,0,0,Math.PI*2); g.fillStyle=grad; g.fill();
+    g.lineWidth=4; g.strokeStyle='#3d2410'; g.stroke();
+    g.strokeStyle='#f2ece2'; g.lineWidth=3;
+    g.beginPath(); g.moveTo(-rx*0.22,-ry*0.55); g.lineTo(-rx*0.22,ry*0.55); g.stroke();
+    g.beginPath(); g.moveTo(rx*0.22,-ry*0.55); g.lineTo(rx*0.22,ry*0.55); g.stroke();
+    g.restore();
+    return c;
+  }
+  function soccerSprite(){
+    const s = spriteSize, c = document.createElement('canvas'); c.width=s; c.height=s;
+    const g = c.getContext('2d'), cx=s/2, cy=s/2, r=s*0.47;
+    g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.fillStyle='#fff'; g.fill();
+    g.lineWidth=3; g.strokeStyle='#999'; g.stroke();
+    function pentagon(x,y,pr,rot){
+      g.beginPath();
+      for(let i=0;i<5;i++){
+        const a = rot + i*(Math.PI*2/5) - Math.PI/2;
+        const px = x+pr*Math.cos(a), py = y+pr*Math.sin(a);
+        if(i===0) g.moveTo(px,py); else g.lineTo(px,py);
+      }
+      g.closePath(); g.fillStyle='#222'; g.fill();
+    }
+    pentagon(cx,cy,r*0.31,0);
+    for(let i=0;i<5;i++){
+      const a = i*(Math.PI*2/5) - Math.PI/2;
+      pentagon(cx+r*0.62*Math.cos(a), cy+r*0.62*Math.sin(a), r*0.22, a+Math.PI/5);
+    }
+    return c;
+  }
+  function basketballSprite(){
+    const s = spriteSize, c = document.createElement('canvas'); c.width=s; c.height=s;
+    const g = c.getContext('2d'), cx=s/2, cy=s/2, r=s*0.47;
+    g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.fillStyle='#e06a1f'; g.fill();
+    g.lineWidth=4; g.strokeStyle='#3a2210';
+    g.beginPath(); g.moveTo(cx,cy-r); g.lineTo(cx,cy+r); g.stroke();
+    g.beginPath(); g.moveTo(cx-r,cy); g.lineTo(cx+r,cy); g.stroke();
+    g.beginPath(); g.moveTo(cx-r,cy); g.quadraticCurveTo(cx,cy-r*0.55,cx+r,cy); g.stroke();
+    g.beginPath(); g.moveTo(cx-r,cy); g.quadraticCurveTo(cx,cy+r*0.55,cx+r,cy); g.stroke();
+    g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.stroke();
+    return c;
+  }
+  const sprites = { football: footballSprite(), soccer: soccerSprite(), basketball: basketballSprite() };
+
+  function drawLaces(ctx, r, spinAngle){
+    const p = Math.cos(spinAngle);
+    if(Math.abs(p) < 0.08) return;
+    const w = r*0.55*Math.abs(p);
+    ctx.save();
+    ctx.strokeStyle = '#f2ece2';
+    ctx.lineWidth = Math.max(1.5, r*0.05);
+    ctx.beginPath(); ctx.moveTo(-w,0); ctx.lineTo(w,0); ctx.stroke();
+    for(let i=-2;i<=2;i++){
+      const x = i*w*0.32;
+      ctx.beginPath(); ctx.moveTo(x,-r*0.09); ctx.lineTo(x,r*0.09); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  const specCanvas = document.getElementById('specimen-canvas');
+  const specCtx = specCanvas.getContext('2d');
+  let specAngle = 0, specLast = null;
+  function specimenLoop(now){
+    if(specLast===null) specLast = now;
+    const dt = (now-specLast)/1000; specLast = now;
+    const rpm = parseFloat(document.getElementById('spin').value) || 0;
+    const spinTypeVal = document.getElementById('spin-type').value;
+    const dir = spinTypeVal === 'top' ? 1 : -1;
+    const omega = rpm*2*Math.PI/60;
+    specAngle += dir*omega*dt*0.35;
+    const s = specCanvas.width;
+    specCtx.clearRect(0,0,s,s);
+    specCtx.save();
+    specCtx.translate(s/2,s/2);
+    specCtx.beginPath(); specCtx.ellipse(0,s*0.40,s*0.30,s*0.08,0,0,Math.PI*2);
+    specCtx.fillStyle='rgba(0,0,0,0.25)'; specCtx.fill();
+    const r = s*0.42;
+    if(sport==='football' && spinTypeVal==='spiral'){
+      specCtx.drawImage(sprites.football, -r, -r, r*2, r*2);
+      drawLaces(specCtx, r, specAngle);
+    } else {
+      specCtx.rotate(specAngle);
+      specCtx.drawImage(sprites[sport], -r, -r, r*2, r*2);
+    }
+    specCtx.restore();
+    requestAnimationFrame(specimenLoop);
+  }
+  requestAnimationFrame(specimenLoop);
+
+  function updateSpecimenLabel(){
+    document.getElementById('spec-name').textContent = names[sport];
+    const mass = parseFloat(document.getElementById('mass').value).toFixed(3);
+    const radius = parseFloat(document.getElementById('radius').value).toFixed(1);
+    document.getElementById('spec-meta').textContent = mass+' kg · '+radius+' cm';
+  }
+
+  const $ = id => document.getElementById(id);
+  const els = {
+    v0:$('v0'), angle:$('angle'), h0:$('h0'),
+    mass:$('mass'), radius:$('radius'), cd:$('cd'),
+    g:$('g'), rho:$('rho'), wind:$('wind'), gPreset:$('g-preset'),
+    spin:$('spin'), spinType:$('spin-type'),
+    goalDist:$('goal-distance'), goalHeight:$('goal-height'),
+    toggleDrag:$('toggle-drag'), toggleMagnus:$('toggle-magnus'),
+    toggleIdeal:$('toggle-ideal'), toggleKeep:$('toggle-keep'),
+    launchBtn:$('launch-btn'), clearBtn:$('clear-btn'),
+    speed:$('speed')
+  };
+
+  function clampField(el){
+    let v = parseFloat(el.value);
+    const min = parseFloat(el.min), max = parseFloat(el.max);
+    if(isNaN(v)) v = min;
+    v = Math.min(max, Math.max(min, v));
+    el.value = v;
+  }
+  ['v0','angle','h0','mass','radius','cd','g','rho','wind','spin','goal-distance','goal-height'].forEach(id=>{
+    $(id).addEventListener('change', ()=>{ clampField($(id)); updateSpecimenLabel(); });
+  });
+  els.gPreset.addEventListener('change', ()=>{
+    if(els.gPreset.value) els.g.value = els.gPreset.value;
+  });
+
+  function populateSpinOptions(name){
+    els.spinType.innerHTML = '';
+    spinOptions[name].forEach(([value,label])=>{
+      const opt = document.createElement('option');
+      opt.value = value; opt.textContent = label;
+      els.spinType.appendChild(opt);
+    });
+  }
+
+  function applyPreset(name){
+    const p = presets[name];
+    populateSpinOptions(name);
+    els.v0.value=p.v0; els.angle.value=p.angle; els.h0.value=p.h0;
+    els.mass.value=p.mass; els.radius.value=p.radius; els.cd.value=p.cd;
+    els.g.value=p.g; els.rho.value=p.rho; els.gPreset.value='';
+    els.spin.value=p.spin; els.spinType.value=p.spinType;
+    els.goalDist.value=goalDistanceDefaults[name]; els.goalHeight.value=goalHeightDefaults[name];
+    sport = name;
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active', t.dataset.sport===name));
+    updateSpecimenLabel();
+  }
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.addEventListener('click', ()=>applyPreset(tab.dataset.sport));
+  });
+
+  const restitution = 0.42;
+  const bounceFriction = 0.80;
+  const rollFriction = 2.0;
+  const spinDecay = 0.15;
+
+  function targetDistance(){ return parseFloat(els.goalDist.value); }
+  function targetHeight(){ return parseFloat(els.goalHeight.value); }
+
+  function readParams(){
+    return {
+      v0: parseFloat(els.v0.value),
+      angle: parseFloat(els.angle.value),
+      h0: parseFloat(els.h0.value),
+      mass: parseFloat(els.mass.value),
+      radius: parseFloat(els.radius.value)/100,
+      cd: parseFloat(els.cd.value),
+      g: parseFloat(els.g.value),
+      rho: parseFloat(els.rho.value),
+      wind: parseFloat(els.wind.value),
+      spinRPM: parseFloat(els.spin.value),
+      spinType: els.spinType.value,
+      useDrag: els.toggleDrag.checked,
+      useMagnus: els.toggleMagnus.checked
+    };
+  }
+
+  function forces(p, vx, vy, omega){
+    const area = Math.PI * p.radius * p.radius;
+    const rvx = vx - p.wind, rvy = vy;
+    const speed = Math.hypot(rvx, rvy) || 1e-6;
+    const grav = [0, -p.g];
+    let drag=[0,0], magnus=[0,0];
+    if(p.useDrag){
+      const f = 0.5*p.rho*p.cd*area*speed/p.mass;
+      drag = [-f*rvx, -f*rvy];
+    }
+    if(p.useMagnus && omega>0 && p.spinType!=='spiral'){
+      const spinRatio = omega*p.radius/speed;
+      const lift = 1/(2 + 1/spinRatio);
+      const f = 0.5*p.rho*lift*area*speed*speed/p.mass;
+      const sign = p.spinType==='back' ? 1 : -1;
+      const px=-rvy/speed, py=rvx/speed;
+      magnus=[sign*f*px, sign*f*py];
+    }
+    return { ax:grav[0]+drag[0]+magnus[0], ay:grav[1]+drag[1]+magnus[1], grav, drag, magnus };
+  }
+
+  function simulateFlight(p){
+    const angleRad=p.angle*Math.PI/180;
+    let vx=p.v0*Math.cos(angleRad), vy=p.v0*Math.sin(angleRad);
+    let x=0,y=p.h0,t=0;
+    const dt=0.004, maxT=25;
+    let omega=p.spinRPM*2*Math.PI/60;
+    const dir=p.spinType==='top'?1:-1;
+    let spinAngle=0;
+    const points=[{t,x,y,vx,vy,spinAngle,speed:p.v0}];
+    let maxHeight=y, prev=null;
+    while(y>=0 && t<maxT){
+      prev={t,x,y,vx,vy,spinAngle};
+      const f=forces(p,vx,vy,omega);
+      vx+=f.ax*dt; vy+=f.ay*dt; x+=vx*dt; y+=vy*dt; t+=dt;
+      spinAngle += dir*omega*dt;
+      omega *= Math.exp(-spinDecay*dt);
+      if(y>maxHeight) maxHeight=y;
+      points.push({t,x,y,vx,vy,spinAngle,speed:Math.hypot(vx,vy)});
+    }
+    const last=points[points.length-1];
+    if(prev && last.y<0 && prev.y>=0){
+      const frac=prev.y/(prev.y-last.y);
+      points[points.length-1] = {
+        t: prev.t+(last.t-prev.t)*frac,
+        x: prev.x+(last.x-prev.x)*frac,
+        y: 0,
+        vx: prev.vx+(last.vx-prev.vx)*frac,
+        vy: prev.vy+(last.vy-prev.vy)*frac,
+        spinAngle: prev.spinAngle+(last.spinAngle-prev.spinAngle)*frac,
+        speed: Math.hypot(prev.vx+(last.vx-prev.vx)*frac, prev.vy+(last.vy-prev.vy)*frac)
+      };
+    }
+    const end=points[points.length-1];
+    return { points, range:end.x, maxHeight, flightTime:end.t, impactSpeed:Math.hypot(end.vx,end.vy) };
+  }
+
+  function simulateBounce(p, flight){
+    const last=flight.points[flight.points.length-1];
+    let vx=last.vx, vy=last.vy, x=last.x, y=0, t=last.t, spinAngle=last.spinAngle;
+    const dt=0.004;
+    const dir=p.spinType==='top'?1:-1;
+    let omega=p.spinRPM*2*Math.PI/60;
+    const pNoLift=Object.assign({}, p, {useMagnus:false});
+    const pts=[]; let bounces=0;
+    while(bounces<4 && Math.abs(vy)>0.4 && t<last.t+4){
+      let prevB={vx,vy,x,y,t};
+      while(y>=0 && t<last.t+4){
+        prevB={vx,vy,x,y,t};
+        const f=forces(pNoLift,vx,vy,omega);
+        vx+=f.ax*dt; vy+=f.ay*dt; x+=vx*dt; y+=vy*dt; t+=dt;
+        spinAngle += dir*omega*dt;
+        pts.push({t,x,y:Math.max(y,0),vx,vy,spinAngle,speed:Math.hypot(vx,vy)});
+      }
+      const frac=prevB.y/(prevB.y-y||1);
+      x=prevB.x+(x-prevB.x)*frac; t=prevB.t+(t-prevB.t)*frac; y=0;
+      vy=-vy*restitution; vx=vx*bounceFriction; omega*=0.6; bounces++;
+      pts.push({t,x,y:0,vx,vy,spinAngle,speed:Math.hypot(vx,vy)});
+    }
+    let rollT=0;
+    while(vx>0.05 && rollT<8){
+      vx=Math.max(vx-rollFriction*dt,0);
+      x+=vx*dt; t+=dt; rollT+=dt;
+      omega=vx/Math.max(p.radius,0.01);
+      spinAngle += dir*omega*dt;
+      pts.push({t,x,y:0,vx,vy:0,spinAngle,speed:vx});
+    }
+    return pts;
+  }
+
+  function idealPath(p){
+    const angleRad=p.angle*Math.PI/180;
+    const vx=p.v0*Math.cos(angleRad), vy0=p.v0*Math.sin(angleRad);
+    const disc=vy0*vy0+2*p.g*p.h0;
+    const tFlight=(vy0+Math.sqrt(Math.max(disc,0)))/p.g;
+    const steps=120, points=[];
+    for(let i=0;i<=steps;i++){
+      const t=tFlight*i/steps;
+      const x=vx*t, y=p.h0+vy0*t-0.5*p.g*t*t;
+      points.push({t,x,y:Math.max(y,0),speed:Math.hypot(vx,vy0-p.g*t)});
+    }
+    const maxHeight=p.h0+(vy0*vy0)/(2*p.g);
+    return { points, range:vx*tFlight, maxHeight, flightTime:tFlight, impactSpeed:Math.hypot(vx,vy0-p.g*tFlight) };
+  }
+
+  function scoreShot(shot, gd, gh){
+    if(sport==='basketball'){
+      let best=null;
+      for(const p of shot.flight.points){
+        if(p.vy<0 && Math.abs(p.x-gd)<0.4){
+          if(!best || Math.abs(p.y-gh)<Math.abs(best.y-gh)) best=p;
+        }
+      }
+      if(best && Math.abs(best.y-gh)<0.35) return 'swish';
+      return 'miss';
+    }
+    const pts=shot.renderPoints;
+    let crossing=null;
+    for(let i=1;i<pts.length;i++){
+      if(pts[i-1].x<gd && pts[i].x>=gd){ crossing=pts[i]; break; }
+    }
+    if(!crossing) return 'short';
+    if(sport==='football') return crossing.y>gh ? 'good' : 'no good';
+    return crossing.y<gh ? 'goal' : 'over';
+  }
+
+  const canvas=$('stage-canvas'), ctx=canvas.getContext('2d');
+  const cw=canvas.width, ch=canvas.height;
+  const margin={left:56,right:36,top:26,bottom:44};
+
+  let shots=[]; let anim=null;
+
+  function fieldBounds(){
+    let maxX=6, maxY=3;
+    shots.forEach(s=>{
+      maxX=Math.max(maxX, s.flight.range, s.ideal?s.ideal.range:0, s.renderPoints[s.renderPoints.length-1].x);
+      maxY=Math.max(maxY, s.flight.maxHeight, s.ideal?s.ideal.maxHeight:0);
+    });
+    maxX=Math.max(maxX, targetDistance()*1.15);
+    maxY=Math.max(maxY, targetHeight()+2.5);
+    return {maxX:maxX*1.08, maxY:maxY*1.2};
+  }
+  function toScreen(x,y,scale){ return { px:margin.left+x*scale, py:ch-margin.bottom-y*scale }; }
+  function pxScale(bounds){
+    const w=cw-margin.left-margin.right, h=ch-margin.top-margin.bottom;
+    return Math.min(w/bounds.maxX, h/bounds.maxY);
+  }
+  function niceStep(maxVal, targetTicks){
+    const raw=maxVal/targetTicks, mag=Math.pow(10,Math.floor(Math.log10(raw))), norm=raw/mag;
+    let step; if(norm<1.5) step=1; else if(norm<3.5) step=2; else if(norm<7.5) step=5; else step=10;
+    return step*mag;
+  }
+  function drawGrid(bounds, scale){
+    ctx.clearRect(0,0,cw,ch);
+    const stepX=niceStep(bounds.maxX,8), stepY=niceStep(bounds.maxY,5);
+    ctx.font='11px monospace'; ctx.fillStyle='#8aa'; ctx.strokeStyle='rgba(0,0,0,0.06)'; ctx.lineWidth=1;
+    for(let gx=0; gx<=bounds.maxX; gx+=stepX){
+      const {px}=toScreen(gx,0,scale);
+      ctx.beginPath(); ctx.moveTo(px,margin.top); ctx.lineTo(px,ch-margin.bottom); ctx.stroke();
+      ctx.fillText(gx.toFixed(gx%1===0?0:1)+'m', px-10, ch-margin.bottom+18);
+    }
+    for(let gy=0; gy<=bounds.maxY; gy+=stepY){
+      const {py}=toScreen(0,gy,scale);
+      ctx.beginPath(); ctx.moveTo(margin.left,py); ctx.lineTo(cw-margin.right,py); ctx.stroke();
+      ctx.fillText(gy.toFixed(gy%1===0?0:1)+'m', 10, py+4);
+    }
+  }
+
+  function drawScenery(bounds, scale){
+    const groundY = toScreen(0,0,scale).py;
+    const gd = targetDistance(), gh = targetHeight();
+    const gx = toScreen(gd,0,scale).px;
+
+    if(sport==='football'){
+      ctx.fillStyle='#bfe0a8'; ctx.fillRect(margin.left, groundY, cw-margin.left-margin.right, ch-margin.bottom-groundY+40);
+      ctx.strokeStyle='#ffffffaa'; ctx.lineWidth=1;
+      for(let yard=5; yard*0.9144<bounds.maxX; yard+=5){
+        const x=yard*0.9144;
+        const {px}=toScreen(x,0,scale);
+        ctx.beginPath(); ctx.moveTo(px,groundY); ctx.lineTo(px,groundY-12); ctx.stroke();
+      }
+      const crossbarY=toScreen(gd,gh,scale).py;
+      const topY=toScreen(gd,gh+2.6,scale).py;
+      ctx.strokeStyle='#d9701f'; ctx.lineWidth=6; ctx.lineCap='round';
+      ctx.beginPath(); ctx.moveTo(gx,groundY); ctx.lineTo(gx,crossbarY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(gx-32,crossbarY); ctx.lineTo(gx+32,crossbarY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(gx-32,crossbarY); ctx.lineTo(gx-32,topY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(gx+32,crossbarY); ctx.lineTo(gx+32,topY); ctx.stroke();
+      ctx.lineCap='butt';
+    } else if(sport==='soccer'){
+      ctx.fillStyle='#a9d98c'; ctx.fillRect(margin.left, groundY, cw-margin.left-margin.right, ch-margin.bottom-groundY+40);
+      ctx.strokeStyle='#ffffff88'; ctx.lineWidth=1;
+      for(let m=5;m<bounds.maxX;m+=5){
+        const {px}=toScreen(m,0,scale);
+        ctx.beginPath(); ctx.moveTo(px,groundY); ctx.lineTo(px,groundY-10); ctx.stroke();
+      }
+      const crossbarY=toScreen(gd,gh,scale).py;
+      const backX=gx+42;
+      ctx.strokeStyle='#eee'; ctx.lineWidth=5;
+      ctx.beginPath(); ctx.moveTo(gx,groundY); ctx.lineTo(gx,crossbarY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(gx,crossbarY); ctx.lineTo(backX,crossbarY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(backX,crossbarY); ctx.lineTo(backX,groundY); ctx.stroke();
+      ctx.strokeStyle='#cccccc99'; ctx.lineWidth=1;
+      for(let i=0;i<=5;i++){
+        const yy=crossbarY+(groundY-crossbarY)*i/5;
+        ctx.beginPath(); ctx.moveTo(gx,yy); ctx.lineTo(backX,yy); ctx.stroke();
+      }
+      for(let i=0;i<=4;i++){
+        const xx=gx+(backX-gx)*i/4;
+        ctx.beginPath(); ctx.moveTo(xx,crossbarY); ctx.lineTo(xx,groundY); ctx.stroke();
+      }
+    } else {
+      ctx.fillStyle='#d9a05b'; ctx.fillRect(margin.left, groundY, cw-margin.left-margin.right, ch-margin.bottom-groundY+40);
+      const keyNear=toScreen(Math.max(0,gd-4.9),0,scale).px;
+      ctx.strokeStyle='#ffffff99'; ctx.lineWidth=1;
+      ctx.strokeRect(keyNear, groundY-46, gx-keyNear, 46);
+      const rimY=toScreen(gd,gh,scale).py;
+      const bbX=toScreen(gd+0.08,0,scale).px;
+      const bbTop=toScreen(gd+0.08,gh+1.05,scale).py;
+      const bbBottom=toScreen(gd+0.08,gh-0.3,scale).py;
+      ctx.strokeStyle='#444'; ctx.lineWidth=7;
+      ctx.beginPath(); ctx.moveTo(bbX,bbTop); ctx.lineTo(bbX,bbBottom); ctx.stroke();
+      ctx.strokeStyle='#d9701f'; ctx.lineWidth=5;
+      ctx.beginPath(); ctx.moveTo(gx-30,rimY); ctx.lineTo(gx+30,rimY); ctx.stroke();
+      ctx.strokeStyle='#eeeeeecc'; ctx.lineWidth=1;
+      for(let i=0;i<6;i++){
+        const xx=gx-24+i*10;
+        ctx.beginPath(); ctx.moveTo(xx,rimY); ctx.lineTo(xx+4,rimY+26); ctx.stroke();
+      }
+    }
+
+    ctx.strokeStyle='#999'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(margin.left,groundY); ctx.lineTo(cw-margin.right,groundY); ctx.stroke();
+  }
+
+  function drawPath(points, scale, color, dashed, alpha){
+    ctx.save(); ctx.globalAlpha=alpha!==undefined?alpha:1; ctx.strokeStyle=color;
+    ctx.lineWidth=dashed?1.6:2.4; ctx.setLineDash(dashed?[5,5]:[]);
+    ctx.beginPath();
+    points.forEach((p,i)=>{ const {px,py}=toScreen(p.x,p.y,scale); if(i===0) ctx.moveTo(px,py); else ctx.lineTo(px,py); });
+    ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+  }
+  function drawBall(x,y,scale,sportName,radiusM,travelAngle,spinAngle,spinType){
+    const {px,py}=toScreen(x,y,scale);
+    const r=Math.min(78, Math.max(20, radiusM*scale*2.1));
+    ctx.save();
+    ctx.beginPath(); ctx.ellipse(px,py+r*0.94,r*0.92,r*0.26,0,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,0,0,0.25)'; ctx.fill();
+    ctx.translate(px,py);
+    if(sportName==='football' && spinType==='spiral'){
+      ctx.rotate(travelAngle);
+      ctx.drawImage(sprites.football, -r, -r, r*2, r*2);
+      drawLaces(ctx, r, spinAngle);
+    } else {
+      ctx.rotate(spinAngle);
+      ctx.drawImage(sprites[sportName], -r, -r, r*2, r*2);
+    }
+    ctx.restore();
+    return {px,py,r};
+  }
+  function drawVector(px,py,vec,scalePix,color){
+    const len=Math.hypot(vec[0],vec[1]); if(len<0.05) return;
+    const ex=px+vec[0]*scalePix, ey=py-vec[1]*scalePix;
+    ctx.save(); ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(ex,ey); ctx.stroke();
+    const ang=Math.atan2(ey-py,ex-px);
+    ctx.beginPath(); ctx.moveTo(ex,ey);
+    ctx.lineTo(ex-7*Math.cos(ang-0.4), ey-7*Math.sin(ang-0.4));
+    ctx.lineTo(ex-7*Math.cos(ang+0.4), ey-7*Math.sin(ang+0.4));
+    ctx.closePath(); ctx.fill(); ctx.restore();
+  }
+  function renderStatic(){
+    const bounds=fieldBounds(), scale=pxScale(bounds);
+    drawGrid(bounds,scale);
+    drawScenery(bounds,scale);
+    shots.forEach(s=>{
+      if(s.ideal) drawPath(s.ideal.points, scale, '#8888', true, 0.85);
+      drawPath(s.flight.points, scale, s.color, false, 1);
+    });
+    return {bounds,scale};
+  }
+
+  const gH=$('graph-height').getContext('2d'), gw1=$('graph-height').width, gh1=$('graph-height').height;
+  const gS=$('graph-speed').getContext('2d'), gw2=$('graph-speed').width, gh2=$('graph-speed').height;
+  const gMargin={left:44,right:16,top:14,bottom:26};
+
+  function drawGraph(g, w, h, field, markerT){
+    g.clearRect(0,0,w,h);
+    if(shots.length===0) return;
+    let maxT=1, maxV=1;
+    shots.forEach(s=>{
+      maxT=Math.max(maxT, s.flight.flightTime, s.ideal?s.ideal.flightTime:0);
+      s.flight.points.forEach(p=>maxV=Math.max(maxV,p[field]));
+      if(s.ideal) s.ideal.points.forEach(p=>maxV=Math.max(maxV,p[field]));
+    });
+    maxT*=1.05; maxV*=1.15;
+    const plotW=w-gMargin.left-gMargin.right, plotH=h-gMargin.top-gMargin.bottom;
+    const sx=t=>gMargin.left+(t/maxT)*plotW;
+    const sy=v=>h-gMargin.bottom-(v/maxV)*plotH;
+
+    g.strokeStyle='#eee'; g.lineWidth=1; g.font='10px monospace'; g.fillStyle='#999';
+    const stepT=niceStep(maxT,4), stepV=niceStep(maxV,4);
+    for(let t=0;t<=maxT;t+=stepT){
+      const x=sx(t); g.beginPath(); g.moveTo(x,gMargin.top); g.lineTo(x,h-gMargin.bottom); g.stroke();
+      g.fillText(t.toFixed(1), x-8, h-gMargin.bottom+14);
+    }
+    for(let v=0;v<=maxV;v+=stepV){
+      const y=sy(v); g.beginPath(); g.moveTo(gMargin.left,y); g.lineTo(w-gMargin.right,y); g.stroke();
+      g.fillText(v.toFixed(v%1===0?0:1), 4, y+3);
+    }
+    g.strokeStyle='#999'; g.beginPath(); g.moveTo(gMargin.left,h-gMargin.bottom); g.lineTo(w-gMargin.right,h-gMargin.bottom); g.stroke();
+
+    shots.forEach(s=>{
+      if(s.ideal){
+        g.save(); g.strokeStyle='#aaa'; g.setLineDash([4,4]); g.lineWidth=1.4; g.globalAlpha=0.85;
+        g.beginPath();
+        s.ideal.points.forEach((p,i)=>{ const x=sx(p.t), y=sy(p[field]); if(i===0) g.moveTo(x,y); else g.lineTo(x,y); });
+        g.stroke(); g.setLineDash([]); g.restore();
+      }
+      g.save(); g.strokeStyle=s.color; g.lineWidth=2.2;
+      g.beginPath();
+      s.flight.points.forEach((p,i)=>{ const x=sx(p.t), y=sy(p[field]); if(i===0) g.moveTo(x,y); else g.lineTo(x,y); });
+      g.stroke(); g.restore();
+
+      if(markerT!==undefined && s===shots[shots.length-1]){
+        const capped=Math.min(markerT, s.flight.flightTime);
+        let pt=s.flight.points[0];
+        for(const p of s.flight.points){ if(p.t<=capped) pt=p; else break; }
+        const x=sx(pt.t), y=sy(pt[field]);
+        g.save(); g.fillStyle=s.color;
+        g.beginPath(); g.arc(x,y,4,0,Math.PI*2); g.fill(); g.restore();
+      }
+    });
+  }
+
+  function showStats(flight, ideal, restDistance, result){
+    $('stat-result').textContent = result.toUpperCase();
+    $('stat-result').style.color = (result==='good'||result==='goal'||result==='swish') ? '#2a7a3f' : '#a33';
+    $('stat-range').innerHTML = flight.range.toFixed(1)+'<span class="unit">m</span>';
+    $('stat-height').innerHTML = flight.maxHeight.toFixed(2)+'<span class="unit">m</span>';
+    $('stat-time').innerHTML = flight.flightTime.toFixed(2)+'<span class="unit">s</span>';
+    $('stat-impact').innerHTML = flight.impactSpeed.toFixed(1)+'<span class="unit">m/s</span>';
+    $('stat-rest').innerHTML = restDistance.toFixed(1)+'<span class="unit">m</span>';
+  }
+
+  function animateShot(shot){
+    if(anim) cancelAnimationFrame(anim);
+    const renderPts=shot.renderPoints;
+    const totalT=renderPts[renderPts.length-1].t;
+    const landingT=shot.flight.flightTime;
+    const speedMul=parseFloat(els.speed.value);
+    let duration=totalT/speedMul;
+    duration=Math.min(Math.max(duration,1.6),9);
+    const startPerf=performance.now();
+
+    function frame(now){
+      const elapsed=(now-startPerf)/1000;
+      const frac=Math.min(elapsed/duration,1);
+      const simT=frac*totalT;
+
+      const {scale}=renderStatic();
+      const capT=Math.min(simT,landingT);
+      let fIdx=0; const fPts=shot.flight.points;
+      while(fIdx<fPts.length-1 && fPts[fIdx+1].t<=capT) fIdx++;
+      drawPath(fPts.slice(0,fIdx+1), scale, shot.color, false, 1);
+
+      let idx=0;
+      while(idx<renderPts.length-1 && renderPts[idx+1].t<=simT) idx++;
+      const cur=renderPts[idx];
+      const travelAngle = Math.atan2(-cur.vy, cur.vx);
+      const info=drawBall(cur.x, cur.y, scale, shot.sport, shot.params.radius, travelAngle, cur.spinAngle, shot.params.spinType);
+
+      if(simT<=landingT){
+        const omegaNow = shot.params.spinRPM*2*Math.PI/60*Math.exp(-spinDecay*Math.min(simT,landingT));
+        const f=forces(shot.params, cur.vx, cur.vy, omegaNow);
+        const vs=10;
+        drawVector(info.px, info.py, f.grav, vs, 'crimson');
+        if(shot.params.useDrag) drawVector(info.px, info.py, f.drag, vs, 'darkorange');
+        if(shot.params.useMagnus) drawVector(info.px, info.py, f.magnus, vs, 'steelblue');
+      }
+
+      drawGraph(gH, gw1, gh1, 'y', simT);
+      drawGraph(gS, gw2, gh2, 'speed', simT);
+
+      if(frac<1){ anim=requestAnimationFrame(frame); }
+      else { renderStatic(); drawGraph(gH,gw1,gh1,'y'); drawGraph(gS,gw2,gh2,'speed'); }
+    }
+    anim=requestAnimationFrame(frame);
+  }
+
+  function launch(){
+    if(anim) cancelAnimationFrame(anim);
+    const p=readParams();
+    const gd=targetDistance(), gh=targetHeight();
+    const flight=simulateFlight(p);
+    const ideal=els.toggleIdeal.checked ? idealPath(p) : null;
+    const bouncePts=simulateBounce(p, flight);
+    const renderPoints=flight.points.concat(bouncePts);
+    const restDistance=renderPoints[renderPoints.length-1].x;
+
+    if(!els.toggleKeep.checked) shots=[];
+    const shot={ flight, ideal, renderPoints, params:p, sport, color:colors[sport] };
+    shots.push(shot);
+
+    const result = scoreShot(shot, gd, gh);
+    showStats(flight, ideal, restDistance, result);
+    animateShot(shot);
+  }
+  function clearAll(){
+    if(anim) cancelAnimationFrame(anim);
+    shots=[];
+    renderStatic(); drawGraph(gH,gw1,gh1,'y'); drawGraph(gS,gw2,gh2,'speed');
+    $('stat-result').textContent='–'; $('stat-result').style.color='';
+    ['stat-range','stat-height','stat-time','stat-impact','stat-rest'].forEach(id=>{
+      const unit = $(id).querySelector('.unit').textContent;
+      $(id).innerHTML = '–<span class="unit">'+unit+'</span>';
+    });
+  }
+  els.launchBtn.addEventListener('click', launch);
+  els.clearBtn.addEventListener('click', clearAll);
+
+  applyPreset('football');
+  renderStatic();
+  drawGraph(gH,gw1,gh1,'y');
+  drawGraph(gS,gw2,gh2,'speed');
+})();
+</script>
+</body>
+</html>
